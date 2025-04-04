@@ -1,0 +1,65 @@
+name: Run PQC_Assessment_Tool
+on:
+  workflow_dispatch: # Allows manual trigger
+  push:
+    branches:
+      - main
+      
+permissions:
+  security-events: write
+  contents: read
+
+jobs:
+    run-pqc-assessment:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Target Repository
+        uses: actions/checkout@v3
+        with:
+          repository: ${{ github.repository }}
+          path: target-repo
+
+      - name: Checkout Test_Tool Repository
+        uses: actions/checkout@v3
+        with:
+          repository: AppViewX-Inc-PE/assessment-tool
+          path: assessment-tool-repo
+
+      - name: Validate Input Folder
+        run: |
+          echo "Checking if input folder exists..."
+          if [ -d "./target-repo" ]; then
+            echo "Input folder exists. Listing contents:"
+            ls -la ./target-repo
+          else
+            echo "Input folder does not exist!"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Prepare Output Folder
+        run: |
+          echo "Ensuring output folder exists..."
+          mkdir -p ./output-folder
+          chmod 755 ./output-folder
+          echo "Output folder ready. Listing contents (if any):"
+          ls -la ./output-folder || echo "Output folder is empty."
+        shell: bash
+
+      - name: Run PQC_Assessment Executable
+        run: |
+          chmod +x ./assessment-tool-repo/PQC_CICD/PQC_Assessment_CICD 
+          ./assessment-tool-repo/PQC_CICD/PQC_Assessment_CICD --inputFolder ./target-repo --outputFolder ./output-folder --configPath ./assessment-tool-repo/PQC_CICD/config.ini
+        shell: bash  
+    
+      - name: Upload CBOM output as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CBOM-output
+          path: ./output-folder
+
+      - name: Upload SARIF Results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ./output-folder/results.sarif
